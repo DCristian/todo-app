@@ -47,7 +47,7 @@ app.route('/todos/:id')
             return res.status(404).send();
         }
 
-        res.send(todo);
+        res.send({todo});
     }))
     .patch(asyncWrap(async (req, res) => {
         const id = req.params.id;
@@ -71,6 +71,8 @@ app.route('/todos/:id')
         if (!todo) {
             return res.status(404).send();
         }
+
+        res.send({todo});
     }))
     .delete(asyncWrap(async (req, res) => {
         const id = req.params.id;
@@ -84,7 +86,7 @@ app.route('/todos/:id')
             return res.status(404).send();
         }
 
-        res.send(todo);
+        res.send({todo});
     }));
 
 app.use((err, req, res, next) => {
