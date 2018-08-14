@@ -1,58 +1,55 @@
 require('./config/config');
-require('./db/mangoose');
 
 const express = require('express');
 const bodyParser = require('body-parser');
-
 const _ = require('lodash');
 const {ObjectID} = require('mongodb');
+
+const mongoose = require('./db/mangoose');
 const {Todo} = require('./models/todo');
 
 const app = express();
 const port = process.env.PORT;
 
+const asyncWrap = fn => (req, res, next) => {
+    Promise.resolve()
+        .then(() => fn(req, res, next))
+        .catch(next);
+};
+
+mongoose.connect();
 app.use(bodyParser.json());
 
 app.route('/todos')
-    .get((req, res) => {
-        Todo.find().then((todos) => {
-            res.send({todos});
-        }, (e) => {
-            res.status(400).send(e);
-        });
-    })
-    .post((req, res) => {
+    .get(asyncWrap(async (req, res) => {
+        let todos = await Todo.find();
+        res.send({todos});
+    }))
+    .post(asyncWrap(async (req, res) => {
         let todo = new Todo({
             text: req.body.text
         });
 
-        todo.save().then((doc) => {
-            res.send(doc);
-        }, (e) => {
-            res.status(400).send(e);
-        });
-    });
+        let doc = await todo.save();
+        res.send(doc);
+    }));
 
 app.route('/todos/:id')
-    .get((req, res) => {
+    .get(asyncWrap(async (req, res) => {
         const id = req.params.id;
 
         if (!ObjectID.isValid(id)) {
             return res.status(404).send();
         }
 
-        Todo.findById(id)
-            .then((todo) => {
-                if (!todo) {
-                    return res.status(404).send();
-                }
+        let todo = await Todo.findById(id);
+        if (!todo) {
+            return res.status(404).send();
+        }
 
-                res.send(todo);
-            }).catch((e) => {
-            res.status(400).send();
-        });
-    })
-    .patch((req, res) => {
+        res.send(todo);
+    }))
+    .patch(asyncWrap(async (req, res) => {
         const id = req.params.id;
         let body = _.pick(req.body, ['text', 'completed']);
 
@@ -70,32 +67,29 @@ app.route('/todos/:id')
 
         body.completed = completed;
 
-        Todo.findByIdAndUpdate(id, {$set: body}, {new: true}).then((todo) => {
-            if (!todo) {
-                return res.status(404).send();
-            }
-
-            res.send({todo});
-        });
-    })
-    .delete((req, res) => {
+        let todo = await Todo.findByIdAndUpdate(id, {$set: body}, {new: true});
+        if (!todo) {
+            return res.status(404).send();
+        }
+    }))
+    .delete(asyncWrap(async (req, res) => {
         const id = req.params.id;
 
         if (!ObjectID.isValid(id)) {
             return res.status(404).send();
         }
 
-        Todo.findByIdAndRemove(id)
-            .then((todo) => {
-                if (!todo) {
-                    return res.status(404).send();
-                }
+        let todo = await Todo.findByIdAndRemove(id);
+        if (!todo) {
+            return res.status(404).send();
+        }
 
-                res.send(todo);
-            }).catch((e) => {
-            res.status(400).send();
-        });
-    });
+        res.send(todo);
+    }));
+
+app.use((err, req, res, next) => {
+    res.status(400).send(err);
+});
 
 app.listen(port, () => {
    console.log(`Started on port ${port}.`);
